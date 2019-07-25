@@ -4,8 +4,7 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <url>https://github.com/o5h/skynet</url>
-    <name>skynet</name>
-
+    <name>SkyNet</name>
     <groupId>com.github.o5h.skynet</groupId>
     <artifactId>skynet</artifactId>
     <version>1.0-SNAPSHOT</version>
@@ -22,6 +21,7 @@
         <module>skynet-sl4j</module>
         <module>skynet-md</module>
         <module>skynet-ur-dashboard</module>
+        <module>skynet-urcap</module>
         <module>examples</module>
     </modules>
 
