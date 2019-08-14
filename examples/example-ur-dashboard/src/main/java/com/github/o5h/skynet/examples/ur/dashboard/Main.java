@@ -1,6 +1,8 @@
+package com.github.o5h.skynet.examples.ur.dashboard;
+
 import com.github.o5h.skynet.ur.dashboard.DashboardClient;
 
-public class Example {
+public class Main {
     public static void main(String[] args) {
         DashboardClient dashboard = new DashboardClient();
         if (args.length != 1) {

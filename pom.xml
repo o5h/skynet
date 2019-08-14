@@ -21,6 +21,7 @@
         <module>skynet-sl4j</module>
         <module>skynet-md</module>
         <module>skynet-ur-dashboard</module>
+        <module>skynet-ur-rtde</module>
         <module>skynet-urcap</module>
         <module>examples</module>
     </modules>

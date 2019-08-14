@@ -110,7 +110,7 @@
             </activation>
             <build>
                 <filters>
-                    <filter>ursim.properties</filter>
+                    <filter>windows-dev.properties</filter>
                 </filters>
                 <plugins>
                     <plugin>
@@ -125,7 +125,7 @@
                                 </goals>
                                 <configuration>
                                     <files>
-                                        <file>${basedir}/ursim.properties</file>
+                                        <file>${basedir}/windows-dev.properties</file>
                                     </files>
                                 </configuration>
                             </execution>

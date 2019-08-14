@@ -114,7 +114,7 @@ public class Logger extends MarkerIgnoringBase {
         if (!isInfoEnabled()) {
             return;
         }
-        log(INFO_LEVEL, MessageFormatter.arrayFormat(msg, null, t).getMessage());
+        log(INFO_LEVEL, MessageFormatter.arrayFormat(msg, null, t).getMessage(), t);
     }
 
     public final boolean isWarnEnabled() {
@@ -153,7 +153,7 @@ public class Logger extends MarkerIgnoringBase {
         if (!isWarnEnabled()) {
             return;
         }
-        log(WARN_LEVEL, MessageFormatter.arrayFormat(msg, new Object[]{}, t).getMessage());
+        log(WARN_LEVEL, MessageFormatter.arrayFormat(msg, new Object[]{}, t).getMessage(), t);
     }
 
     public final boolean isErrorEnabled() {
@@ -192,11 +192,15 @@ public class Logger extends MarkerIgnoringBase {
         if (!isErrorEnabled()) {
             return;
         }
-        log(ERROR_LEVEL, MessageFormatter.arrayFormat(msg, null, t).getMessage());
+        log(ERROR_LEVEL, MessageFormatter.arrayFormat(msg, null, t).getMessage(), t);
     }
 
     private void log(String level, String msg) {
         System.out.println(level + ":" + msg);
+    }
+    private void log(String level, String msg, Throwable t) {
+        System.out.println(level + ":" + msg);
+        t.printStackTrace();
     }
 
 }
