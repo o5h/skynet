@@ -16,6 +16,7 @@
 
     <modules>
         <module>example-ur-dashboard</module>
+        <module>example-ur-rtde</module>
     </modules>
 
 </project>
