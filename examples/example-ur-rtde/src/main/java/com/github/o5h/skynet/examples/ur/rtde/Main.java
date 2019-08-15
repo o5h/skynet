@@ -39,11 +39,11 @@ public class Main {
         });
         client.connect("192.168.234.128", RTDEClient.PORT, 0);
         client.requestProtocolVersion(1);
-        client.setupOutputsV1("actual_TCP_pose", "actual_TCP_speed"); //RTDE_CONTROL_PACKAGE_SETUP_INPUTS
+        client.setupOutputsV1("actual_TCP_pose", "target_TCP_pose", "actual_q"); //RTDE_CONTROL_PACKAGE_SETUP_INPUTS
         client.start();
         client.requestProtocolVersion(2);
 
-        Thread.sleep(1000);
+        Thread.sleep(100000);
         client.disconnect();
     }
 
