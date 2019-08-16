@@ -28,22 +28,29 @@ public class Main {
             }
 
             @Override
-            public void onPackage(RTDEClient.Package p) {
-                LOG.info("Package {}", p);
+            public void onControlPackageStart() {
+                LOG.info("Controller package START");
             }
 
             @Override
-            public void onControlPackageStart() {
-                LOG.info("Controller package START");
+            public void onControlPackagePause() {
+                LOG.info("Controller package PAUSE");
             }
         });
         client.connect("192.168.234.128", RTDEClient.PORT, 0);
         client.requestProtocolVersion(1);
-        client.setupOutputsV1("actual_TCP_pose", "target_TCP_pose", "actual_q"); //RTDE_CONTROL_PACKAGE_SETUP_INPUTS
-        client.start();
-        client.requestProtocolVersion(2);
 
-        Thread.sleep(100000);
+        client.setupOutputsV1("actual_TCP_pose",
+                "target_TCP_pose",
+                "actual_q",
+                "elbow_velocity");
+        client.start();
+        Thread.sleep(1000);
+        client.pause();
+        Thread.sleep(1000);
+        client.start();
+        Thread.sleep(1000);
+
         client.disconnect();
     }
 

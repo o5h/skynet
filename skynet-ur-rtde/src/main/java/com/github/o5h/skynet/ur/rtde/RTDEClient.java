@@ -7,6 +7,7 @@ import java.io.*;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.charset.Charset;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -37,7 +38,9 @@ public class RTDEClient {
     public static final int RTDE_TEXT_MESSAGE = 77;//	M
     public static final int RTDE_DATA_PACKAGE = 85;//	U
     public static final int RTDE_CONTROL_PACKAGE_SETUP_OUTPUTS = 79;//	O
+    public static final int RTDE_CONTROL_PACKAGE_SETUP_INPUTS = 73;// I
     public static final int RTDE_CONTROL_PACKAGE_START = 83;//	S
+    public static final int RTDE_CONTROL_PACKAGE_PAUSE = 80; // P
 
     private static final Logger LOG = LoggerFactory.getLogger(RTDEClient.class);
 
@@ -49,9 +52,9 @@ public class RTDEClient {
 
         void onProtocolVersion(int protocolVersion);
 
-        void onPackage(Package p);
-
         void onControlPackageStart();
+
+        void onControlPackagePause();
     }
 
     private final Handler handler;
@@ -60,7 +63,7 @@ public class RTDEClient {
     private RTDEInputStream inputStream;
     private volatile int protocolVersion = 1;
     private volatile int requestedProtocolVersion = 0;
-    private Map<Integer, Recepy> recepies = new HashMap<Integer, Recepy>();
+    private final Map<Integer, Recepy> recepies = new HashMap<Integer, Recepy>();
 
     public RTDEClient(Handler handler) {
         this.handler = handler;
@@ -122,6 +125,9 @@ public class RTDEClient {
                 case RTDE_CONTROL_PACKAGE_START:
                     onStart();
                     break;
+                case RTDE_CONTROL_PACKAGE_PAUSE:
+                    onPause();
+                    break;
                 case RTDE_DATA_PACKAGE:
                     onDataPackage(size);
                     break;
@@ -155,32 +161,22 @@ public class RTDEClient {
         return true;
     }
 
-    private static void closeSilently(Closeable closeable) {
-        try {
-            if (closeable == null) {
-                return;
-            }
-            closeable.close();
-        } catch (IOException e) {
-            LOG.warn(e.getMessage(), e);
-        }
-    }
-
     public int getProtocolVersion() {
         return protocolVersion;
     }
 
     public void requestProtocolVersion(int protocolVersion) throws IOException {
+        this.requestedProtocolVersion = protocolVersion;
         this.outputStream.writeUInt16(5);
         this.outputStream.writeUInt8(RTDE_REQUEST_PROTOCOL_VERSION);
         this.outputStream.writeUInt16(protocolVersion);
-        this.requestedProtocolVersion = 1;
+        this.outputStream.flush();
     }
 
     public synchronized void setupOutputsV1(String... variables) throws IOException {
         StringBuilder sb = new StringBuilder();
         Recepy recepy = new Recepy();
-        this.recepies.put(1, recepy);
+        this.recepies.put(0, recepy);
         recepy.outVariableTypes = new VariableType[variables.length];
         recepy.outVariableNames = new String[variables.length];
         recepy.outVariableValue = new Object[variables.length];
@@ -207,6 +203,12 @@ public class RTDEClient {
         this.outputStream.flush();
     }
 
+    public synchronized void pause() throws IOException {
+        this.outputStream.writeUInt16(3);
+        this.outputStream.writeUInt8(RTDE_CONTROL_PACKAGE_PAUSE);
+        this.outputStream.flush();
+    }
+
     private void onProtocolVersion() throws IOException {
         if (this.inputStream.readBool()) {
             this.protocolVersion = requestedProtocolVersion;
@@ -220,13 +222,19 @@ public class RTDEClient {
         }
     }
 
+    private void onPause() throws IOException {
+        if (this.inputStream.readBool()) {
+            this.handler.onControlPackagePause();
+        }
+    }
+
     private void onControlPackageOutputResponse(int size) throws IOException {
         if (this.protocolVersion == 1) {
             byte[] data = new byte[size - 3];
             this.inputStream.readFully(data);
             String values = new String(data, DEFAULT_CHARSET);
             String[] types = values.split(",");
-            Recepy recepy = this.recepies.get(1);
+            Recepy recepy = this.recepies.get(0);
             for (int i = 0; i < types.length; i++) {
                 String typeName = types[i];
                 VariableType type = VariableType.valueOf(typeName);
@@ -241,21 +249,34 @@ public class RTDEClient {
     }
 
     private void onDataPackage(int size) throws IOException {
-        int recipeId = this.inputStream.readUInt8();
+        int recipeId = 0;
+        if (protocolVersion == 2) {
+            recipeId = this.inputStream.readUInt8();
+        }
         Recepy recepy = this.recepies.get(recipeId);
         for (int i = 0; i < recepy.outVariableNames.length; i++) {
             switch (recepy.outVariableTypes[i]) {
                 case NOT_FOUND:
                     break;
-                case VECTOR6D:
-                    Vector6d newValue = this.inputStream.readVector6d();
-                    if (!newValue.equals(recepy.outVariableValue[i])) {
+
+                case VECTOR6D: {
+                    double[] newValue = this.inputStream.readVector6d();
+                    if (!Arrays.equals(newValue, (double[]) recepy.outVariableValue[i])) {
                         recepy.outVariableValue[i] = newValue;
-                        LOG.debug("{}={}", recepy.outVariableNames[i], recepy.outVariableValue[i]);
+                        LOG.debug(">> {}={}", recepy.outVariableNames[i], recepy.outVariableValue[i]);
                     }
-                    break;
-                case VECTOR3D:
-                    break;
+                }
+                break;
+
+                case VECTOR3D: {
+                    double[] newValue = this.inputStream.readVector3d();
+                    if (!Arrays.equals(newValue, (double[]) recepy.outVariableValue[i])) {
+                        recepy.outVariableValue[i] = newValue;
+                        LOG.debug(">> {}={}", recepy.outVariableNames[i], recepy.outVariableValue[i]);
+                    }
+                }
+                break;
+
                 case VECTOR6INT32:
                     break;
                 case VECTOR6UINT32:
@@ -276,11 +297,10 @@ public class RTDEClient {
         }
     }
 
-
     private void onUnsupportedPackage(int size, int type) throws IOException {
         byte[] data = new byte[size - 3];
         this.inputStream.readFully(data);
-        LOG.warn("Unsupported package type {}", type);
+        LOG.warn("Unsupported package type {} {} {}", type, size, new String(data, DEFAULT_CHARSET));
     }
 
     private boolean available() {
@@ -347,17 +367,24 @@ public class RTDEClient {
             is.close();
         }
 
-        public Vector6d readVector6d() throws IOException {
-            Vector6d vec = new Vector6d();
-            vec.x = readDouble();
-            vec.y = readDouble();
-            vec.z = readDouble();
-            vec.rx = readDouble();
-            vec.ry = readDouble();
-            vec.rz = readDouble();
+        public double[] readVector6d() throws IOException {
+            double[] vec = new double[6];
+            vec[0] = readDouble();
+            vec[1] = readDouble();
+            vec[2] = readDouble();
+            vec[3] = readDouble();
+            vec[4] = readDouble();
+            vec[5] = readDouble();
             return vec;
         }
 
+        public double[] readVector3d() throws IOException {
+            double[] vec = new double[3];
+            vec[0] = readDouble();
+            vec[1] = readDouble();
+            vec[2] = readDouble();
+            return vec;
+        }
     }
 
     private class RTDEOutputStream implements Closeable {
@@ -422,6 +449,17 @@ public class RTDEClient {
         VariableType[] outVariableTypes;
         String[] outVariableNames;
         Object[] outVariableValue;
+    }
+
+    private static void closeSilently(Closeable closeable) {
+        try {
+            if (closeable == null) {
+                return;
+            }
+            closeable.close();
+        } catch (IOException e) {
+            LOG.warn(e.getMessage(), e);
+        }
     }
 
 }
