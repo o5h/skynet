@@ -3,11 +3,13 @@ package com.github.o5h.skynet.ur.rtde;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.*;
+import java.io.Closeable;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.charset.Charset;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -16,56 +18,20 @@ import java.util.Map;
  */
 public class RTDEClient {
 
-    private static final Charset DEFAULT_CHARSET = Charset.forName("UTF-8");
     public static final int PORT = 30004;
 
-    private enum VariableType {
-        NOT_FOUND,
-        VECTOR6D,
-        VECTOR3D,
-        VECTOR6INT32,
-        VECTOR6UINT32,
-        DOUBLE,
-        UINT64,
-        UINT32,
-        INT32,
-        BOOL,
-        UINT8
-    }
-
-    public static final int RTDE_REQUEST_PROTOCOL_VERSION = 86; //V
-    public static final int RTDE_GET_URCONTROL_VERSION = 118;//	v
-    public static final int RTDE_TEXT_MESSAGE = 77;//	M
-    public static final int RTDE_DATA_PACKAGE = 85;//	U
-    public static final int RTDE_CONTROL_PACKAGE_SETUP_OUTPUTS = 79;//	O
-    public static final int RTDE_CONTROL_PACKAGE_SETUP_INPUTS = 73;// I
-    public static final int RTDE_CONTROL_PACKAGE_START = 83;//	S
-    public static final int RTDE_CONTROL_PACKAGE_PAUSE = 80; // P
-
+    private static final Charset DEFAULT_CHARSET = Charset.forName("UTF-8");
     private static final Logger LOG = LoggerFactory.getLogger(RTDEClient.class);
 
-    public interface Handler {
-
-        void onConnect();
-
-        void onDisconnect();
-
-        void onProtocolVersion(int protocolVersion);
-
-        void onControlPackageStart();
-
-        void onControlPackagePause();
-    }
-
-    private final Handler handler;
     private volatile Socket socket;
     private RTDEOutputStream outputStream;
     private RTDEInputStream inputStream;
     private volatile int protocolVersion = 1;
     private volatile int requestedProtocolVersion = 0;
+    private final RTDEOutputHandler handler;
     private final Map<Integer, Recepy> recepies = new HashMap<Integer, Recepy>();
 
-    public RTDEClient(Handler handler) {
+    public RTDEClient(RTDEOutputHandler handler) {
         this.handler = handler;
     }
 
@@ -116,19 +82,19 @@ public class RTDEClient {
             int size = this.inputStream.readUInt16();
             int type = this.inputStream.readUInt8();
             switch (type) {
-                case RTDE_REQUEST_PROTOCOL_VERSION:
+                case RTDEProtocol.RTDE_REQUEST_PROTOCOL_VERSION:
                     onProtocolVersion();
                     break;
-                case RTDE_CONTROL_PACKAGE_SETUP_OUTPUTS:
+                case RTDEProtocol.RTDE_CONTROL_PACKAGE_SETUP_OUTPUTS:
                     onControlPackageOutputResponse(size);
                     break;
-                case RTDE_CONTROL_PACKAGE_START:
+                case RTDEProtocol.RTDE_CONTROL_PACKAGE_START:
                     onStart();
                     break;
-                case RTDE_CONTROL_PACKAGE_PAUSE:
+                case RTDEProtocol.RTDE_CONTROL_PACKAGE_PAUSE:
                     onPause();
                     break;
-                case RTDE_DATA_PACKAGE:
+                case RTDEProtocol.RTDE_DATA_PACKAGE:
                     onDataPackage(size);
                     break;
                 default:
@@ -161,51 +127,47 @@ public class RTDEClient {
         return true;
     }
 
-    public int getProtocolVersion() {
-        return protocolVersion;
-    }
-
     public void requestProtocolVersion(int protocolVersion) throws IOException {
         this.requestedProtocolVersion = protocolVersion;
         this.outputStream.writeUInt16(5);
-        this.outputStream.writeUInt8(RTDE_REQUEST_PROTOCOL_VERSION);
+        this.outputStream.writeUInt8(RTDEProtocol.RTDE_REQUEST_PROTOCOL_VERSION);
         this.outputStream.writeUInt16(protocolVersion);
         this.outputStream.flush();
     }
 
-    public synchronized void setupOutputsV1(String... variables) throws IOException {
-        StringBuilder sb = new StringBuilder();
+    public synchronized void setupOutputsV1(RTDEOutputParam... variables) throws IOException {
         Recepy recepy = new Recepy();
+        recepy.outTypes = new RTDEDataType[variables.length];
+        recepy.outParameters = new RTDEOutputParam[variables.length];
         this.recepies.put(0, recepy);
-        recepy.outVariableTypes = new VariableType[variables.length];
-        recepy.outVariableNames = new String[variables.length];
-        recepy.outVariableValue = new Object[variables.length];
+
+        StringBuilder sb = new StringBuilder();
         for (int i = 0; i < variables.length; i++) {
             if (i != 0) {
                 sb.append(",");
             }
-            String name = variables[i];
-            recepy.outVariableNames[i] = name;
-            sb.append(name);
+            RTDEOutputParam output = variables[i];
+            recepy.outParameters[i] = output;
+            sb.append(output.name);
         }
         String variableNames = sb.toString();
         byte[] data = variableNames.getBytes(DEFAULT_CHARSET);
 
         this.outputStream.writeUInt16(3 + data.length);
-        this.outputStream.writeUInt8(RTDE_CONTROL_PACKAGE_SETUP_OUTPUTS);
+        this.outputStream.writeUInt8(RTDEProtocol.RTDE_CONTROL_PACKAGE_SETUP_OUTPUTS);
         this.outputStream.write(data);
         this.outputStream.flush();
     }
 
     public synchronized void start() throws IOException {
         this.outputStream.writeUInt16(3);
-        this.outputStream.writeUInt8(RTDE_CONTROL_PACKAGE_START);
+        this.outputStream.writeUInt8(RTDEProtocol.RTDE_CONTROL_PACKAGE_START);
         this.outputStream.flush();
     }
 
     public synchronized void pause() throws IOException {
         this.outputStream.writeUInt16(3);
-        this.outputStream.writeUInt8(RTDE_CONTROL_PACKAGE_PAUSE);
+        this.outputStream.writeUInt8(RTDEProtocol.RTDE_CONTROL_PACKAGE_PAUSE);
         this.outputStream.flush();
     }
 
@@ -237,8 +199,8 @@ public class RTDEClient {
             Recepy recepy = this.recepies.get(0);
             for (int i = 0; i < types.length; i++) {
                 String typeName = types[i];
-                VariableType type = VariableType.valueOf(typeName);
-                recepy.outVariableTypes[i] = type;
+                RTDEDataType type = RTDEDataType.valueOf(typeName);
+                recepy.outTypes[i] = type;
             }
             LOG.debug("VALUES {}", values);
         } else if (this.protocolVersion == 2) {
@@ -254,44 +216,42 @@ public class RTDEClient {
             recipeId = this.inputStream.readUInt8();
         }
         Recepy recepy = this.recepies.get(recipeId);
-        for (int i = 0; i < recepy.outVariableNames.length; i++) {
-            switch (recepy.outVariableTypes[i]) {
+
+        for (int i = 0; i < recepy.outParameters.length; i++) {
+            RTDEOutputParam var = recepy.outParameters[i];
+            switch (recepy.outTypes[i]) {
                 case NOT_FOUND:
                     break;
-
-                case VECTOR6D: {
-                    double[] newValue = this.inputStream.readVector6d();
-                    if (!Arrays.equals(newValue, (double[]) recepy.outVariableValue[i])) {
-                        recepy.outVariableValue[i] = newValue;
-                        LOG.debug(">> {}={}", recepy.outVariableNames[i], recepy.outVariableValue[i]);
-                    }
-                }
-                break;
-
-                case VECTOR3D: {
-                    double[] newValue = this.inputStream.readVector3d();
-                    if (!Arrays.equals(newValue, (double[]) recepy.outVariableValue[i])) {
-                        recepy.outVariableValue[i] = newValue;
-                        LOG.debug(">> {}={}", recepy.outVariableNames[i], recepy.outVariableValue[i]);
-                    }
-                }
-                break;
-
-                case VECTOR6INT32:
+                case VECTOR6D:
+                    this.handler.onData(var, this.inputStream.readVector6Double());
                     break;
+                case VECTOR3D:
+                    this.handler.onData(var, this.inputStream.readVector3Double());
+                    break;
+                case VECTOR6INT32:
+                    this.handler.onData(var, this.inputStream.readVector6Int32());
+                    break;
+
                 case VECTOR6UINT32:
+                    this.handler.onData(var, this.inputStream.readVector6UInt32());
                     break;
                 case DOUBLE:
+                    this.handler.onData(var, this.inputStream.readDouble());
                     break;
                 case UINT64:
+                    this.handler.onData(var, this.inputStream.readUInt64());
                     break;
                 case UINT32:
+                    this.handler.onData(var, this.inputStream.readUInt32());
                     break;
                 case INT32:
+                    this.handler.onData(var, this.inputStream.readInt32());
                     break;
                 case BOOL:
+                    this.handler.onData(var, this.inputStream.readUInt8() != 0);
                     break;
                 case UINT8:
+                    this.handler.onData(var, this.inputStream.readUInt8());
                     break;
             }
         }
@@ -303,7 +263,7 @@ public class RTDEClient {
         LOG.warn("Unsupported package type {} {} {}", type, size, new String(data, DEFAULT_CHARSET));
     }
 
-    private boolean available() {
+    private synchronized boolean available() {
         try {
             if (!isConnected()) {
                 return false;
@@ -316,139 +276,9 @@ public class RTDEClient {
         }
     }
 
-    private class RTDEInputStream implements Closeable {
-
-        private final DataInputStream is;
-
-        public RTDEInputStream(InputStream is) {
-            this.is = new DataInputStream(is);
-        }
-
-        public int available() throws IOException {
-            return is.available();
-        }
-
-        public boolean readBool() throws IOException {
-            return is.readUnsignedByte() != 0;
-        }
-
-        public int readUInt8() throws IOException {
-            return is.readUnsignedByte();
-        }
-
-        public int readUInt16() throws IOException {
-            return is.readUnsignedShort();
-        }
-
-        public int readInt32() throws IOException {
-            return is.readInt();
-        }
-
-        public final long readUInt32() throws IOException {
-            long ch1 = is.read();
-            long ch2 = is.read();
-            long ch3 = is.read();
-            long ch4 = is.read();
-            if ((ch1 | ch2 | ch3 | ch4) < 0)
-                throw new EOFException();
-            return ((ch1 << 24) + (ch2 << 16) + (ch3 << 8) + (ch4 << 0));
-        }
-
-        private double readDouble() throws IOException {
-            return is.readDouble();
-        }
-
-        public void readFully(byte[] data) throws IOException {
-            this.is.readFully(data);
-        }
-
-        @Override
-        public void close() throws IOException {
-            is.close();
-        }
-
-        public double[] readVector6d() throws IOException {
-            double[] vec = new double[6];
-            vec[0] = readDouble();
-            vec[1] = readDouble();
-            vec[2] = readDouble();
-            vec[3] = readDouble();
-            vec[4] = readDouble();
-            vec[5] = readDouble();
-            return vec;
-        }
-
-        public double[] readVector3d() throws IOException {
-            double[] vec = new double[3];
-            vec[0] = readDouble();
-            vec[1] = readDouble();
-            vec[2] = readDouble();
-            return vec;
-        }
-    }
-
-    private class RTDEOutputStream implements Closeable {
-        private final DataOutputStream os;
-
-        public RTDEOutputStream(DataOutputStream os) {
-            this.os = os;
-        }
-
-        public void writeUInt8(int value) throws IOException {
-            this.os.writeByte(value);
-        }
-
-        public void writeUInt16(int value) throws IOException {
-            this.os.writeShort(value);
-        }
-
-        @Override
-        public void close() throws IOException {
-            this.os.close();
-        }
-
-        public void flush() throws IOException {
-            this.os.flush();
-        }
-
-        public void write(byte[] data) throws IOException {
-            os.write(data);
-        }
-    }
-
-    public static abstract class Package {
-
-        protected final int type; //uint8_t
-
-        public Package(int type) {
-            this.type = type;
-        }
-
-        public int getType() {
-            return type;
-        }
-
-        public abstract int getSize();
-
-        public abstract void writeTo(RTDEOutputStream os) throws IOException;
-
-        public abstract void readFrom(RTDEInputStream is) throws IOException;
-
-        protected void writeHeader(RTDEOutputStream os) throws IOException {
-            os.writeUInt16(getSize());
-            os.writeUInt8(type);
-        }
-
-        @Override
-        public String toString() {
-            return "{" + type + "}";
-        }
-    }
-
     private static class Recepy {
-        VariableType[] outVariableTypes;
-        String[] outVariableNames;
-        Object[] outVariableValue;
+        RTDEDataType[] outTypes;
+        RTDEOutputParam[] outParameters;
     }
 
     private static void closeSilently(Closeable closeable) {

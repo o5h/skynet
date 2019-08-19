@@ -2,56 +2,50 @@ package com.github.o5h.skynet.examples.ur.rtde;
 
 
 import com.github.o5h.skynet.ur.rtde.RTDEClient;
+import com.github.o5h.skynet.ur.rtde.RTDEOutputParam;
+import com.github.o5h.skynet.ur.rtde.RTDEOutputHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.concurrent.CountDownLatch;
 
 public class Main {
     private static final Logger LOG = LoggerFactory.getLogger(Main.class);
 
     public static void main(String[] args) throws InterruptedException, IOException {
-        final RTDEClient client = new RTDEClient(new RTDEClient.Handler() {
-            @Override
-            public void onConnect() {
-                LOG.info("Connected");
-            }
-
-            @Override
-            public void onDisconnect() {
-                LOG.info("Disconnected");
-            }
-
+        final CountDownLatch countDownLatch = new CountDownLatch(1);
+        final RTDEClient client = new RTDEClient(new RTDEOutputHandler() {
             @Override
             public void onProtocolVersion(int protocolVersion) {
-                LOG.info("PROTOCOL VERSION {}", protocolVersion);
+                countDownLatch.countDown();
             }
 
             @Override
-            public void onControlPackageStart() {
-                LOG.info("Controller package START");
-            }
-
-            @Override
-            public void onControlPackagePause() {
-                LOG.info("Controller package PAUSE");
+            public void onData(RTDEOutputParam output, Object value) {
+                LOG.info("{} {}", output, value);
             }
         });
-        client.connect("192.168.234.128", RTDEClient.PORT, 0);
-        client.requestProtocolVersion(1);
 
-        client.setupOutputsV1("actual_TCP_pose",
-                "target_TCP_pose",
-                "actual_q",
-                "elbow_velocity");
-        client.start();
-        Thread.sleep(1000);
-        client.pause();
-        Thread.sleep(1000);
-        client.start();
-        Thread.sleep(1000);
+        if (client.connect("192.168.234.128", RTDEClient.PORT, 0)) {
+            client.requestProtocolVersion(1);
+            // to be sure that protocol version is selected properly
+            countDownLatch.await();
 
-        client.disconnect();
+            client.setupOutputsV1(RTDEOutputParam.actual_TCP_pose,
+                    RTDEOutputParam.target_TCP_pose,
+                    RTDEOutputParam.actual_q,
+                    RTDEOutputParam.elbow_velocity,
+                    RTDEOutputParam.actual_main_voltage);
+            client.start();
+            Thread.sleep(1000);
+//            client.pause();
+//            Thread.sleep(1000);
+//            client.start();
+//            Thread.sleep(1000);
+
+            client.disconnect();
+        }
     }
 
 }
