@@ -29,9 +29,12 @@ public class RTDEOutputStream implements Closeable {
         os.write(data);
     }
 
+    public void writeDouble(double v) throws IOException {
+        this.os.writeDouble(v);
+    }
+
     @Override
     public void close() throws IOException {
         this.os.close();
     }
-
 }

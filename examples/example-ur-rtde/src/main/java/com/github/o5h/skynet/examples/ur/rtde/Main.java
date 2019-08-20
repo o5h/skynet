@@ -18,27 +18,35 @@ public class Main {
         final RTDEClient client = new RTDEClient(new RTDEOutputHandler() {
             @Override
             public void onProtocolVersion(int protocolVersion) {
+                LOG.info("protocolVersion = {}", protocolVersion);
                 countDownLatch.countDown();
+            }
+
+            @Override
+            public void onSetupOutputsResponse(RTDEOutputParam[] supported, RTDEOutputParam[] unsupported) {
+                LOG.info("Supported {}, Unsupported {}", supported, unsupported);
             }
 
             @Override
             public void onData(RTDEOutputParam output, Object value) {
                 LOG.info("{} {}", output, value);
             }
+
         });
 
         if (client.connect("192.168.234.128", RTDEClient.PORT, 0)) {
             client.requestProtocolVersion(1);
             // to be sure that protocol version is selected properly
             countDownLatch.await();
-
-            client.setupOutputsV1(RTDEOutputParam.actual_TCP_pose,
+            client.setupOutputsV2(1,
+                    RTDEOutputParam.actual_TCP_pose,
                     RTDEOutputParam.target_TCP_pose,
                     RTDEOutputParam.actual_q,
                     RTDEOutputParam.elbow_velocity,
-                    RTDEOutputParam.actual_main_voltage);
+                    RTDEOutputParam.actual_main_voltage,
+                    RTDEOutputParam.tool_output_mode);
             client.start();
-            Thread.sleep(1000);
+            Thread.sleep(100);
 //            client.pause();
 //            Thread.sleep(1000);
 //            client.start();

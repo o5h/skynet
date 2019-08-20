@@ -11,6 +11,10 @@ public abstract class RTDEOutputHandler {
     public void onProtocolVersion(int protocolVersion) {
     }
 
+    public void onSetupOutputsResponse(RTDEOutputParam[] supported,
+                                       RTDEOutputParam[] unsupported) {
+    }
+
     public void onControlPackageStart() {
     }
 

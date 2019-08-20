@@ -10,8 +10,8 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.charset.Charset;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * See User manual for details.
@@ -29,7 +29,8 @@ public class RTDEClient {
     private volatile int protocolVersion = 1;
     private volatile int requestedProtocolVersion = 0;
     private final RTDEOutputHandler handler;
-    private final Map<Integer, Recepy> recepies = new HashMap<Integer, Recepy>();
+    private RTDEOutputParam[] outParameters;
+    private boolean[] supported;
 
     public RTDEClient(RTDEOutputHandler handler) {
         this.handler = handler;
@@ -136,10 +137,8 @@ public class RTDEClient {
     }
 
     public synchronized void setupOutputsV1(RTDEOutputParam... variables) throws IOException {
-        Recepy recepy = new Recepy();
-        recepy.outTypes = new RTDEDataType[variables.length];
-        recepy.outParameters = new RTDEOutputParam[variables.length];
-        this.recepies.put(0, recepy);
+        this.outParameters = new RTDEOutputParam[variables.length];
+        this.supported = new boolean[variables.length];
 
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < variables.length; i++) {
@@ -147,7 +146,7 @@ public class RTDEClient {
                 sb.append(",");
             }
             RTDEOutputParam output = variables[i];
-            recepy.outParameters[i] = output;
+            this.outParameters[i] = output;
             sb.append(output.name);
         }
         String variableNames = sb.toString();
@@ -155,6 +154,28 @@ public class RTDEClient {
 
         this.outputStream.writeUInt16(3 + data.length);
         this.outputStream.writeUInt8(RTDEProtocol.RTDE_CONTROL_PACKAGE_SETUP_OUTPUTS);
+        this.outputStream.write(data);
+        this.outputStream.flush();
+    }
+
+    public synchronized void setupOutputsV2(double outputFrequency, RTDEOutputParam... variables) throws IOException {
+        this.outParameters = new RTDEOutputParam[variables.length];
+        this.supported = new boolean[variables.length];
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < variables.length; i++) {
+            if (i != 0) {
+                sb.append(",");
+            }
+            RTDEOutputParam output = variables[i];
+            this.outParameters[i] = output;
+            sb.append(output.name);
+        }
+        String variableNames = sb.toString();
+        byte[] data = variableNames.getBytes(DEFAULT_CHARSET);
+
+        this.outputStream.writeUInt16(11 + data.length);
+        this.outputStream.writeUInt8(RTDEProtocol.RTDE_CONTROL_PACKAGE_SETUP_OUTPUTS);
+        this.outputStream.writeDouble(outputFrequency);
         this.outputStream.write(data);
         this.outputStream.flush();
     }
@@ -192,36 +213,49 @@ public class RTDEClient {
 
     private void onControlPackageOutputResponse(int size) throws IOException {
         if (this.protocolVersion == 1) {
-            byte[] data = new byte[size - 3];
-            this.inputStream.readFully(data);
-            String values = new String(data, DEFAULT_CHARSET);
-            String[] types = values.split(",");
-            Recepy recepy = this.recepies.get(0);
-            for (int i = 0; i < types.length; i++) {
-                String typeName = types[i];
-                RTDEDataType type = RTDEDataType.valueOf(typeName);
-                recepy.outTypes[i] = type;
-            }
-            LOG.debug("VALUES {}", values);
+            int stringSize = size - 3;
+            recepyOutputResponse(stringSize);
         } else if (this.protocolVersion == 2) {
-            throw new UnsupportedOperationException("Not implemented yet");
+            this.inputStream.readUInt8(); // ignored
+            int stringSize = size - 4;
+            recepyOutputResponse(stringSize);
         } else {
             throw new IOException(" Unsupported protocol " + protocolVersion);
         }
     }
 
-    private void onDataPackage(int size) throws IOException {
-        int recipeId = 0;
-        if (protocolVersion == 2) {
-            recipeId = this.inputStream.readUInt8();
-        }
-        Recepy recepy = this.recepies.get(recipeId);
+    private void recepyOutputResponse(int stringSize) throws IOException {
+        byte[] data = new byte[stringSize];
+        this.inputStream.readFully(data);
+        String values = new String(data, DEFAULT_CHARSET);
+        String[] types = values.split(",");
+        ArrayList<RTDEOutputParam> supportedParams = new ArrayList<RTDEOutputParam>();
+        ArrayList<RTDEOutputParam> unsupportedParams = new ArrayList<RTDEOutputParam>();
+        for (int i = 0; i < types.length; i++) {
+            String typeName = types[i];
+            RTDEDataType type = RTDEDataType.valueOf(typeName);
 
-        for (int i = 0; i < recepy.outParameters.length; i++) {
-            RTDEOutputParam var = recepy.outParameters[i];
-            switch (recepy.outTypes[i]) {
-                case NOT_FOUND:
-                    break;
+            if (this.outParameters[i].type == type) {
+                supportedParams.add(this.outParameters[i]);
+            } else {
+                unsupportedParams.add(this.outParameters[i]);
+            }
+        }
+        handler.onSetupOutputsResponse(
+                supportedParams.toArray(new RTDEOutputParam[0]),
+                unsupportedParams.toArray(new RTDEOutputParam[0])
+        );
+        LOG.debug("VALUES {}", values);
+    }
+
+    private void onDataPackage(int size) throws IOException {
+        if (protocolVersion == 2) {
+            this.inputStream.readUInt8(); // ignored
+        }
+
+        for (int i = 0; i < this.outParameters.length; i++) {
+            RTDEOutputParam var = this.outParameters[i];
+            switch (this.outParameters[i].type) {
                 case VECTOR6D:
                     this.handler.onData(var, this.inputStream.readVector6Double());
                     break;
@@ -231,7 +265,6 @@ public class RTDEClient {
                 case VECTOR6INT32:
                     this.handler.onData(var, this.inputStream.readVector6Int32());
                     break;
-
                 case VECTOR6UINT32:
                     this.handler.onData(var, this.inputStream.readVector6UInt32());
                     break;
@@ -274,11 +307,6 @@ public class RTDEClient {
             disconnect();
             return false;
         }
-    }
-
-    private static class Recepy {
-        RTDEDataType[] outTypes;
-        RTDEOutputParam[] outParameters;
     }
 
     private static void closeSilently(Closeable closeable) {
