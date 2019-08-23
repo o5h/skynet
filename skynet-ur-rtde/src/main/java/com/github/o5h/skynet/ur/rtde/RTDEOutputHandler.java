@@ -1,6 +1,6 @@
 package com.github.o5h.skynet.ur.rtde;
 
-public abstract class RTDEOutputHandler {
+public class RTDEOutputHandler {
 
     public void onConnect() {
     }
@@ -15,11 +15,19 @@ public abstract class RTDEOutputHandler {
                                        RTDEOutputParam[] unsupported) {
     }
 
+    public void onSetupInputsResponse(int id,
+                                      RTDEInputParam[] supported,
+                                      RTDEInputParam[] unsupported) {
+    }
+
+
     public void onControlPackageStart() {
     }
 
     public void onControlPackagePause() {
     }
 
-    public abstract void onData(RTDEOutputParam output, Object value);
+    public void onData(RTDEOutputParam output, Object value) {
+    }
+
 }

@@ -18,26 +18,20 @@ public class RTDEInputStream implements Closeable {
         return is.readUnsignedByte() != 0;
     }
 
-    public int readUInt8() throws IOException {
-        return is.readUnsignedByte();
+    public byte readUInt8() throws IOException {
+        return (byte)is.readUnsignedByte();
     }
 
-    public int readUInt16() throws IOException {
-        return is.readUnsignedShort();
+    public short readUInt16() throws IOException {
+        return (short)is.readUnsignedShort();
     }
 
     public int readInt32() throws IOException {
         return is.readInt();
     }
 
-    public long readUInt32() throws IOException {
-        long ch1 = is.read();
-        long ch2 = is.read();
-        long ch3 = is.read();
-        long ch4 = is.read();
-        if ((ch1 | ch2 | ch3 | ch4) < 0)
-            throw new EOFException();
-        return ((ch1 << 24) + (ch2 << 16) + (ch3 << 8) + (ch4 << 0));
+    public int readUInt32() throws IOException {
+        return is.readInt();
     }
 
     public long readUInt64() throws IOException {

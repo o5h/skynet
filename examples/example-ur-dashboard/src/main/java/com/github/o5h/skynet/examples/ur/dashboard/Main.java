@@ -9,7 +9,7 @@ public class Main {
             System.out.println("Use host name or ip address as a parameter");
             return;
         }
-        String host = args[0];
+        String host = "192.168.234.129";
         if (dashboard.connect(host)) {
             try {
                 dashboard.powerOn();

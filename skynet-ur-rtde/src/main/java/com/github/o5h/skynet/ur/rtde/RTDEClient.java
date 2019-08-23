@@ -11,7 +11,6 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
-import java.util.List;
 
 /**
  * See User manual for details.
@@ -30,14 +29,16 @@ public class RTDEClient {
     private volatile int requestedProtocolVersion = 0;
     private final RTDEOutputHandler handler;
     private RTDEOutputParam[] outParameters;
-    private boolean[] supported;
+    private RTDEInputParam[] requestedInput;
+    private RTDEInputParam[][] inputParams = new RTDEInputParam[255][];
+
 
     public RTDEClient(RTDEOutputHandler handler) {
         this.handler = handler;
     }
 
     public synchronized boolean connect(String host, int port, int timeout) {
-        LOG.debug("Connect to RTDE {} {}", host, port);
+        LOG.debug("Connecting to RTDE {} {}", host, port);
         if (this.socket != null) {
             return this.socket.isConnected();
         }
@@ -89,6 +90,9 @@ public class RTDEClient {
                 case RTDEProtocol.RTDE_CONTROL_PACKAGE_SETUP_OUTPUTS:
                     onControlPackageOutputResponse(size);
                     break;
+                case RTDEProtocol.RTDE_CONTROL_PACKAGE_SETUP_INPUTS:
+                    onControlPackageInputsResponse(size);
+                    break;
                 case RTDEProtocol.RTDE_CONTROL_PACKAGE_START:
                     onStart();
                     break;
@@ -117,7 +121,6 @@ public class RTDEClient {
             return true;
         }
         this.handler.onDisconnect();
-        ;
         closeSilently(socket);
         this.socket = null;
         closeSilently(this.outputStream);
@@ -138,8 +141,6 @@ public class RTDEClient {
 
     public synchronized void setupOutputsV1(RTDEOutputParam... variables) throws IOException {
         this.outParameters = new RTDEOutputParam[variables.length];
-        this.supported = new boolean[variables.length];
-
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < variables.length; i++) {
             if (i != 0) {
@@ -158,15 +159,17 @@ public class RTDEClient {
         this.outputStream.flush();
     }
 
-    public synchronized void setupOutputsV2(double outputFrequency, RTDEOutputParam... variables) throws IOException {
-        this.outParameters = new RTDEOutputParam[variables.length];
-        this.supported = new boolean[variables.length];
+    public synchronized void setupOutputsV2(double outputFrequency, RTDEOutputParam... outputs) throws IOException {
+        if (outputs.length == 0) {
+            return;
+        }
+        this.outParameters = new RTDEOutputParam[outputs.length];
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < variables.length; i++) {
+        for (int i = 0; i < outputs.length; i++) {
             if (i != 0) {
                 sb.append(",");
             }
-            RTDEOutputParam output = variables[i];
+            RTDEOutputParam output = outputs[i];
             this.outParameters[i] = output;
             sb.append(output.name);
         }
@@ -180,15 +183,35 @@ public class RTDEClient {
         this.outputStream.flush();
     }
 
-    public synchronized void start() throws IOException {
+    public synchronized void startOutput() throws IOException {
         this.outputStream.writeUInt16(3);
         this.outputStream.writeUInt8(RTDEProtocol.RTDE_CONTROL_PACKAGE_START);
         this.outputStream.flush();
     }
 
-    public synchronized void pause() throws IOException {
+    public synchronized void pauseOutput() throws IOException {
         this.outputStream.writeUInt16(3);
         this.outputStream.writeUInt8(RTDEProtocol.RTDE_CONTROL_PACKAGE_PAUSE);
+        this.outputStream.flush();
+    }
+
+    public void setupInputs(RTDEInputParam... inputs) throws IOException {
+        this.requestedInput = new RTDEInputParam[inputs.length];
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < inputs.length; i++) {
+            if (i != 0) {
+                sb.append(",");
+            }
+            RTDEInputParam input = inputs[i];
+            this.requestedInput[i] = input;
+            sb.append(input.name);
+        }
+        String variableNames = sb.toString();
+        byte[] data = variableNames.getBytes(DEFAULT_CHARSET);
+
+        this.outputStream.writeUInt16(3 + data.length);
+        this.outputStream.writeUInt8(RTDEProtocol.RTDE_CONTROL_PACKAGE_SETUP_INPUTS);
+        this.outputStream.write(data);
         this.outputStream.flush();
     }
 
@@ -222,6 +245,93 @@ public class RTDEClient {
         } else {
             throw new IOException(" Unsupported protocol " + protocolVersion);
         }
+    }
+
+    public void sendData(int id, Object... data) throws IOException {
+        int packageSize = 0;
+        RTDEInputParam[] params = this.inputParams[id];
+        for (int i = 0; i < params.length; i++) {
+            RTDEDataType type = params[i].type;
+            if (type == RTDEDataType.STRING) {
+                packageSize += ((String) data[i]).getBytes().length;
+            } else {
+                packageSize += params[i].type.size;
+            }
+        }
+
+        this.outputStream.writeUInt16(packageSize + 4);
+        this.outputStream.writeUInt8(RTDEProtocol.RTDE_DATA_PACKAGE);
+        this.outputStream.writeUInt8(id);
+        for (int i = 0; i < params.length; i++) {
+            switch (params[i].type) {
+                case BOOL:
+                    if ((Boolean)data[i]) {
+                        this.outputStream.writeUInt8(1);
+                    } else {
+                        this.outputStream.writeUInt8(0);
+                    }
+                    break;
+                case UINT8:
+                    this.outputStream.writeUInt8((Integer)data[i]);
+                    break;
+                case UINT32:
+                    this.outputStream.writeUInt32((Integer)data[i]);
+                    break;
+                case UINT64:
+                    this.outputStream.writeUInt64((Long)data[i]);
+                    break;
+                case INT32:
+                    this.outputStream.writeInt32((Integer)data[i]);
+                    break;
+                case DOUBLE:
+                    this.outputStream.writeDouble((Double)data[i]);
+                    break;
+                case VECTOR3D:
+                    this.outputStream.writeVector3d((double[]) data[i]);
+                    break;
+                case VECTOR6D:
+                    this.outputStream.writeVector6d((double[]) data[i]);
+                    break;
+                case VECTOR6INT32:
+                    this.outputStream.writeVector6i((int[]) data[i]);
+                    break;
+                case VECTOR6UINT32:
+                    this.outputStream.writeVector6u((int[]) data[i]);
+                    break;
+                case STRING:
+                    this.outputStream.write(((String) data[i]).getBytes());
+                    break;
+            }
+        }
+        this.outputStream.flush();
+    }
+
+
+    private void onControlPackageInputsResponse(int size) throws IOException {
+        int id = this.inputStream.readUInt8(); // ignored
+        byte[] data = new byte[size - 4];
+        this.inputStream.readFully(data);
+        String values = new String(data, DEFAULT_CHARSET);
+        String[] types = values.split(",");
+        ArrayList<RTDEInputParam> supportedParams = new ArrayList<RTDEInputParam>();
+        ArrayList<RTDEInputParam> unsupportedParams = new ArrayList<RTDEInputParam>();
+
+        for (int i = 0; i < types.length; i++) {
+            String typeName = types[i];
+            RTDEDataType type = RTDEDataType.valueOf(typeName);
+            if (this.requestedInput[i].type == type) {
+                supportedParams.add(this.requestedInput[i]);
+            } else {
+                unsupportedParams.add(this.requestedInput[i]);
+            }
+        }
+        if (id != 0) {
+            inputParams[id] = supportedParams.toArray(new RTDEInputParam[]{});
+            handler.onSetupInputsResponse(id, inputParams[id], null);
+        } else {
+            handler.onSetupInputsResponse(id, null, unsupportedParams.toArray(new RTDEInputParam[]{}));
+        }
+        LOG.debug("VALUES {}", values);
     }
 
     private void recepyOutputResponse(int stringSize) throws IOException {
@@ -293,7 +403,7 @@ public class RTDEClient {
     private void onUnsupportedPackage(int size, int type) throws IOException {
         byte[] data = new byte[size - 3];
         this.inputStream.readFully(data);
-        LOG.warn("Unsupported package type {} {} {}", type, size, new String(data, DEFAULT_CHARSET));
+        LOG.warn("Unsupported package type {} size={} value={}", type, size, new String(data,  DEFAULT_CHARSET));
     }
 
     private synchronized boolean available() {
