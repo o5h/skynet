@@ -2,6 +2,7 @@ package com.github.o5h.skynet.examples.ur.rtde;
 
 
 import com.github.o5h.skynet.ur.rtde.RTDEClient;
+import com.github.o5h.skynet.ur.rtde.RTDEInputParam;
 import com.github.o5h.skynet.ur.rtde.RTDEOutputParam;
 import com.github.o5h.skynet.ur.rtde.RTDEOutputHandler;
 import org.slf4j.Logger;
@@ -46,6 +47,7 @@ public class Main {
                     RTDEOutputParam.actual_main_voltage,
                     RTDEOutputParam.tool_output_mode);
             client.start();
+            client.setupInputs(RTDEInputParam.speed_slider_fraction);
             Thread.sleep(100);
 //            client.pause();
 //            Thread.sleep(1000);
