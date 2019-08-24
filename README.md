@@ -18,3 +18,12 @@ call mvn install:install-file -Dfile=artifacts/archetype/com.ur.urcap.archetype-
 * For testing purposes you should have [URCaps Starter Package](https://plus.universal-robots.com/download-center/urcaps-starter-package/) with Universal Robots offline PolyScope simulator or real robot.
 * Java 1.6 or better
  
+---
+##Q/A 
+### Setup ssh server
+```
+sudo apt update
+sudo apt install openssh-server
+sudo systemctl status ssh
+
+```

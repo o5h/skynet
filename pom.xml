@@ -24,6 +24,7 @@
         <module>skynet-ur-rtde</module>
         <module>skynet-urcap</module>
         <module>examples</module>
+        <module>incubator</module>
     </modules>
 
 </project>

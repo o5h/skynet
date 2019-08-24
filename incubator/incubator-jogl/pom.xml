@@ -2,9 +2,9 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <name>skynet-urcap</name>
+    <name>incubator-jogl</name>
     <groupId>com.github.o5h.skynet</groupId>
-    <artifactId>skynet-urcap</artifactId>
+    <artifactId>incubator-jogl</artifactId>
     <version>1.0-SNAPSHOT</version>
     <packaging>bundle</packaging>
 
@@ -12,6 +12,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>1.6</maven.compiler.source>
         <maven.compiler.target>1.6</maven.compiler.target>
+        <jogl.version>2.3.2</jogl.version>
     </properties>
 
     <dependencies>
@@ -30,6 +31,31 @@
             <artifactId>skynet-ur-dashboard</artifactId>
             <version>1.0-SNAPSHOT</version>
         </dependency>
+
+        <!-- jogl -->
+        <dependency>
+            <groupId>org.jogamp.gluegen</groupId>
+            <artifactId>gluegen-rt</artifactId>
+            <version>${jogl.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jogamp.jogl</groupId>
+            <artifactId>jogl-all</artifactId>
+            <version>${jogl.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jogamp.gluegen</groupId>
+            <artifactId>gluegen-rt</artifactId>
+            <version>${jogl.version}</version>
+            <classifier>natives-linux-amd64</classifier>
+        </dependency>
+        <dependency>
+            <groupId>org.jogamp.jogl</groupId>
+            <artifactId>jogl-all</artifactId>
+            <version>${jogl.version}</version>
+            <classifier>natives-linux-amd64</classifier>
+        </dependency>
+
         <!-- provided -->
         <dependency>
             <groupId>org.osgi</groupId>
@@ -73,19 +99,30 @@
                 </executions>
                 <configuration>
                     <instructions>
-                        <urcap.symbolicname>com.github.o5h.skynet.ur.urcap</urcap.symbolicname>
+                        <urcap.symbolicname>com.github.o5h.skynet.ur.urcap.jogl</urcap.symbolicname>
                         <Bundle-Category>URCap</Bundle-Category>
                         <Bundle-Activator>com.github.o5h.skynet.ur.urcap.bundle.Activator</Bundle-Activator>
                         <Bundle-Vendor>Oleksandr Shaposhnikov</Bundle-Vendor>
                         <Bundle-ContactAddress>https://www.linkedin.com/in/5h4pk1n</Bundle-ContactAddress>
                         <Bundle-Copyright>Copyright (C) 2019 Oleksandr Shaposhnikov</Bundle-Copyright>
                         <Bundle-LicenseType>MIT License</Bundle-LicenseType>
-                        <Bundle-Description>SkyNet URCap</Bundle-Description>
+                        <Bundle-Description>SkyNet URCap JOGL</Bundle-Description>
+                        <Bundle-NativeCode>
+                            natives/linux-amd64/libjogl_desktop.so;
+                            natives/linux-amd64/libjogl_mobile.so;
+                            natives/linux-amd64/libnativewindow_awt.so;
+                            natives/linux-amd64/libnativewindow_x11.so;
+                            natives/linux-amd64/libnewt.so;
+                            osname=linux;
+                            processor=amd64;
+                            processor=x86_64
+                        </Bundle-NativeCode>
                         <Import-Package>
                             com.ur.urcap.api*;version="[1.7.0,2.0.0)",
                             *;resolution:=optional
                         </Import-Package>
                         <Embed-Dependency>*;scope=compile;type=!pom;inline=false;artifactId=!junit</Embed-Dependency>
+                        <Embed-Transitive>true</Embed-Transitive>
                     </instructions>
                 </configuration>
             </plugin>
@@ -122,7 +159,7 @@
                                 </goals>
                                 <configuration>
                                     <files>
-                                        <file>${basedir}/../windows-dev.properties</file>
+                                        <file>${basedir}/../../windows-dev.properties</file>
                                     </files>
                                 </configuration>
                             </execution>
