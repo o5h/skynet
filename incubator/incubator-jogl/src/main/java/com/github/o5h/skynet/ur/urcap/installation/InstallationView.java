@@ -4,53 +4,42 @@ import com.jogamp.opengl.*;
 import com.jogamp.opengl.awt.GLCanvas;
 import com.ur.urcap.api.contribution.ViewAPIProvider;
 import com.ur.urcap.api.contribution.installation.swing.SwingInstallationNodeView;
+import demos.es2.RawGL2ES2demo;
 
 import javax.swing.*;
 
 public class InstallationView implements SwingInstallationNodeView<Installation> {
+
+    private GLCanvas glcanvas;
+    private JPanel panel;
+    private RawGL2ES2demo demo;
 
     InstallationView(ViewAPIProvider api) {
     }
 
     @Override
     public void buildUI(JPanel jPanel, final Installation installationNode) {
-        JPanel panel = new JPanel();
+        this.panel = new JPanel();
+        panel.setSize(jPanel.getSize());
         jPanel.add(panel);
-        final GLProfile profile = GLProfile.get(GLProfile.GL2ES2);
-        GLCapabilities capabilities = new GLCapabilities(profile);
 
-        // The canvas
-        final GLCanvas glcanvas = new GLCanvas(capabilities);
-        BasicFrame b = new BasicFrame();
-        glcanvas.addGLEventListener(b);
-        glcanvas.setSize(400, 400);
-        panel.add(glcanvas);
     }
 
+    public void onOpen() {
+        // The canvas
+        final GLProfile profile = GLProfile.get(GLProfile.GL2ES2);
+        GLCapabilities capabilities = new GLCapabilities(profile);
+        glcanvas = new GLCanvas(capabilities);
+         demo = new RawGL2ES2demo();
+        glcanvas.addGLEventListener(demo);
+        glcanvas.setSize(panel.getWidth(), panel.getHeight());
+        panel.add(glcanvas);
+        glcanvas.setEnabled(true);
+    }
 
-    public class BasicFrame implements GLEventListener {
-
-        @Override
-        public void display(GLAutoDrawable arg0) {
-            // method body
-        }
-
-        @Override
-        public void dispose(GLAutoDrawable arg0) {
-            //method body
-        }
-
-        @Override
-        public void init(GLAutoDrawable arg0) {
-            // method body
-        }
-
-        @Override
-        public void reshape(GLAutoDrawable drawable, int arg1, int arg2, int arg3, int arg4) {
-            // method body
-            final GL2ES2 gl = drawable.getGL().getGL2ES2();
-            gl.glClear(GL2.GL_COLOR_BUFFER_BIT | GL2.GL_DEPTH_BUFFER_BIT);
-            gl.glClearColor(0,1,0,0);
-        }
+    public void onClose() {
+        glcanvas.setEnabled(false);
+        glcanvas.disposeGLEventListener(demo, true);
+        panel.remove(glcanvas);
     }
 }

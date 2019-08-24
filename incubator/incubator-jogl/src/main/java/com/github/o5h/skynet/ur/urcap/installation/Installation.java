@@ -9,19 +9,23 @@ import com.ur.urcap.api.domain.script.ScriptWriter;
 
 public class Installation implements InstallationNodeContribution {
 
+    private final InstallationView view;
+
     Installation(InstallationAPIProvider apiProvider,
                  DataModel model,
                  InstallationView view,
                  CreationContext context) {
+        this.view = view;
     }
 
     @Override
     public void openView() {
+        view.onOpen();
     }
 
     @Override
     public void closeView() {
-
+        view.onClose();
     }
 
     @Override

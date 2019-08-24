@@ -17,7 +17,7 @@ public class InstallationService implements SwingInstallationNodeService<Install
 
     @Override
     public String getTitle(Locale locale) {
-        return "SkyNet";
+        return "JOGL";
     }
 
     @Override
