@@ -413,7 +413,7 @@ public class DashboardClient {
     public static void main(String[] args) {
         DashboardClient dashboard = new DashboardClient();
         try {
-            dashboard.connect("localhost");
+            dashboard.connect("192.168.234.129");
             dashboard.powerOn();
             dashboard.brakeRelease();
             Thread.sleep(1000);

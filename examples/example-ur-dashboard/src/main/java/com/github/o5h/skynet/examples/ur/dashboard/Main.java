@@ -14,7 +14,7 @@ public class Main {
             try {
                 dashboard.powerOn();
                 dashboard.brakeRelease();
-                dashboard.load("default.urcap");
+                dashboard.load("default.urp");
                 dashboard.play();
                 DashboardClient.ProgramState state = dashboard.programState();
                 System.out.println("Program state is  " + state);
