@@ -2,6 +2,7 @@ package com.github.o5h.skynet.md;
 
 import com.github.o5h.skynet.md.table.HTMLParser;
 import com.github.o5h.skynet.md.table.Table;
+import com.github.o5h.skynet.md.table.TableParser;
 import org.junit.Test;
 import org.xml.sax.SAXException;
 
@@ -32,6 +33,21 @@ public class ParserTest {
         Block block = doc.getBlocks()[0].getBlocks()[1];
         assertEquals("Function: Test", block.getTitle());
         assertEquals("def test():\nend\n", block.getLastSection(Section.Type.CODE).toString());
+    }
+
+    @Test
+    public void parse_popup_table() {
+        Parser parser = new Parser();
+        Reader reader = open("popup.md");
+        Block doc = parser.parse(reader);
+        Block dataModelBlock = doc.getBlocks()[0]
+                .getBlocks()[0]
+                .getBlock("DataModel");
+        Section tableSection = dataModelBlock.getFirstSection(Section.Type.TABLE);
+        String[] lines = tableSection.getLines();
+        TableParser tableParser = new TableParser();
+        Table table = tableParser.parse(lines);
+        assertEquals("id", table.getRows()[0].getCells()[0].toString());
     }
 
     @Test

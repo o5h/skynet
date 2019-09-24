@@ -12,13 +12,14 @@
 
 ### DataModel
 
-|id       |type    | default |validator|
-|---------|--------|---------|---------|
-|msg      | string |         | [0,128] |
-|title    | string | Message | [0,32]  |
-|warning  | bool   | false   |         |
-|error    | bool   | false   |         |
-|blocking | bool   | false   |         |
+|id       |type    | default |validator  |
+|---------|--------|---------|-----------|
+|msg      | string |         | [0...128] |
+|title    | string | Message | [0...32]  |
+|warning  | bool   | false   |           |
+|error    | bool   | false   |           |
+|blocking | bool   | false   |           |
+
 
 ### Script
 

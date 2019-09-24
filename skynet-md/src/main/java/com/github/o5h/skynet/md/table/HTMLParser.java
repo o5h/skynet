@@ -42,7 +42,7 @@ public class HTMLParser {
                 String colspan = attributes.getValue("colspan");
 
                 if (colspan != null) {
-                    cell.setColspan(Integer.valueOf(colspan));
+                    cell.setColspan(Integer.parseInt(colspan));
                 }
                 row.add(cell);
             } else if ("input".equals(name)) {
