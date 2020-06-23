@@ -23,6 +23,7 @@
         <module>skynet-ur-dashboard</module>
         <module>skynet-ur-rtde</module>
         <module>skynet-urcap</module>
+        <module>skynet-rpcagent</module>
         <module>examples</module>
         <module>incubator</module>
     </modules>

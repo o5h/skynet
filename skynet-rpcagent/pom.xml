@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <name>skynet-rpcagent</name>
+    <groupId>com.github.o5h.skynet</groupId>
+    <artifactId>skynet-rpcagent</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>bundle</packaging>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.source>1.6</maven.compiler.source>
+        <maven.compiler.target>1.6</maven.compiler.target>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.github.o5h.skynet</groupId>
+            <artifactId>skynet-sl4j</artifactId>
+            <version>1.0-SNAPSHOT</version>
+        </dependency>
+        <!-- provided -->
+        <dependency>
+            <groupId>org.osgi</groupId>
+            <artifactId>org.osgi.core</artifactId>
+            <version>4.3.0</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>com.ur.urcap</groupId>
+            <artifactId>api</artifactId>
+            <version>1.7.0</version>
+            <scope>provided</scope>
+        </dependency>
+
+
+        <!-- test dependencies -->
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.12</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.felix</groupId>
+                <artifactId>maven-bundle-plugin</artifactId>
+                <version>2.4.0</version>
+                <extensions>true</extensions>
+                <executions>
+                    <execution>
+                        <id>bundle-manifest</id>
+                        <phase>process-classes</phase>
+                        <goals>
+                            <goal>manifest</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <instructions>
+                        <urcap.symbolicname>com.github.o5h.skynet.rpcagent</urcap.symbolicname>
+                        <Bundle-Category>URCap</Bundle-Category>
+                        <Bundle-Activator>com.github.o5h.skynet.rpcagent.bundle.Activator</Bundle-Activator>
+                        <Bundle-Vendor>Oleksandr Shaposhnikov</Bundle-Vendor>
+                        <Bundle-ContactAddress>https://www.linkedin.com/in/5h4pk1n</Bundle-ContactAddress>
+                        <Bundle-Copyright>Copyright (C) 2019 Oleksandr Shaposhnikov</Bundle-Copyright>
+                        <Bundle-LicenseType>MIT License</Bundle-LicenseType>
+                        <Bundle-Description>SkyNet RPC Agent URCap</Bundle-Description>
+                        <Import-Package>
+                            com.ur.urcap.api*;version="[1.7.0,2.0.0)",
+                            *;resolution:=optional
+                        </Import-Package>
+                        <Embed-Dependency>*;scope=compile;type=!pom;inline=false;artifactId=!junit</Embed-Dependency>
+                    </instructions>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <profile>
+            <id>linux-dev</id>
+            <activation>
+                <os>
+                    <family>Unix</family>
+                </os>
+            </activation>
+        </profile>
+        <profile>
+            <id>windows-dev</id>
+            <activation>
+                <os>
+                    <family>Windows</family>
+                </os>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>properties-maven-plugin</artifactId>
+                        <version>1.0-alpha-2</version>
+                        <executions>
+                            <execution>
+                                <phase>initialize</phase>
+                                <goals>
+                                    <goal>read-project-properties</goal>
+                                </goals>
+                                <configuration>
+                                    <files>
+                                        <file>${basedir}/../windows-dev.private.properties</file>
+                                    </files>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>1.1</version>
+                        <executions>
+                            <execution>
+                                <id>remote-install-urcap</id>
+                                <phase>install</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>pscp</executable>
+                                    <!--suppress UnresolvedMavenProperty -->
+                                    <!-- @formatter:off -->
+                                    <commandlineArgs>-l ${ursim.username} -pw ${ursim.password} -P ${ursim.port} ./target/${project.build.finalName}.jar ${ursim.host}:${ursim.urcaps}</commandlineArgs>
+                                    <!-- @formatter:on -->
+                                    <workingDirectory>.</workingDirectory>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+</project>

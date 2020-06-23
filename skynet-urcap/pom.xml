@@ -122,7 +122,7 @@
                                 </goals>
                                 <configuration>
                                     <files>
-                                        <file>${basedir}/../windows-dev.properties</file>
+                                        <file>${basedir}/../windows-dev.private.properties</file>
                                     </files>
                                 </configuration>
                             </execution>
@@ -143,7 +143,7 @@
                                     <executable>pscp</executable>
                                     <!--suppress UnresolvedMavenProperty -->
                                     <!-- @formatter:off -->
-                                    <commandlineArgs>-pw ${ursim.password} ./target/${project.build.finalName}.jar ${ursim.username}@${ursim.host}:${ursim.urcaps}</commandlineArgs>
+                                    <commandlineArgs>-l ${ursim.username} -pw ${ursim.password} -P ${ursim.port} ./target/${project.build.finalName}.jar ${ursim.host}:${ursim.urcaps}</commandlineArgs>
                                     <!-- @formatter:on -->
                                     <workingDirectory>.</workingDirectory>
                                 </configuration>

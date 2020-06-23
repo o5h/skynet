@@ -1,0 +1,7 @@
+#NAT
+ursim.host=127.0.0.1
+#forwarding port
+ursim.port=2232
+ursim.username=u.
+ursim.password=e....t
+ursim.urcaps=/home/ur/ursim-current/.urcaps
